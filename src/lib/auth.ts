@@ -39,12 +39,6 @@ export const auth = betterAuth({
 			clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
 		},
 	},
-	logger: {
-		level: "debug",
-		log(level, message, args){
-			console.log(level, message, ...args);
-		}
-	},
 	plugins: [
 		openAPI(),
 		adminPlugin(),

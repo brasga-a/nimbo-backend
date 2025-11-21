@@ -27,5 +27,5 @@ COPY --from=builder /app/drizzle ./drizzle
 # Expõe a porta
 EXPOSE 3000
 
-# Executa com bun diretamente
-CMD ["bun", "run", "src/index.ts"]
+# Executa com bun start
+CMD ["bun", "start"]
