@@ -95,16 +95,27 @@ docker run -p 3000:3000 \
 
 ## Troubleshooting
 
+### Erro "Cannot find module '@/lib/auth'"
+
+Este erro ocorre quando o `tsconfig.json` não está sendo copiado para o container. O Dockerfile já está configurado para copiar:
+- `tsconfig.json` (necessário para resolver path aliases como `@/lib/auth`)
+- `drizzle/` (schemas e migrations do banco)
+- `src/` (código fonte)
+
 ### Container não inicia
 
 Verifique os logs:
 ```bash
 docker logs <container-id>
+# ou com docker-compose
+docker-compose logs -f
 ```
 
 ### Variáveis de ambiente não carregam
 
 Certifique-se de que o arquivo `.env` está na mesma pasta do `docker-compose.yml`
+
+No Railway, configure as variáveis diretamente no painel, não use `.env`
 
 ### Porta já em uso
 
