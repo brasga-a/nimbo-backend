@@ -11,7 +11,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 
 # Runtime stage - Imagem slim do Bun
-FROM oven/bun:latest-slim
+FROM oven/bun:latest
 
 WORKDIR /app
 
