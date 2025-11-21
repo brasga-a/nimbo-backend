@@ -1,33 +1,29 @@
-# Build stage - Gera o binário
+# Build stage
 FROM oven/bun:latest AS builder
 
 WORKDIR /app
 
 # Copia package.json e instala dependências
 COPY package.json bun.lockb* ./
-RUN bun install --frozen-lockfile --production
+RUN bun install --frozen-lockfile
 
 # Copia o código fonte
 COPY . .
 
-# Gera o binário standalone
-RUN bun build src/index.ts \
-    --compile \
-    --minify \
-    --sourcemap \
-    --target=bun \
-    --outfile=server
-
-# Runtime stage - Executa o binário
-FROM gcr.io/distroless/base-debian12
+# Runtime stage - Imagem slim do Bun
+FROM oven/bun:latest-slim
 
 WORKDIR /app
 
-# Copia apenas o binário do stage anterior
-COPY --from=builder /app/server /app/server
+# Copia node_modules e código da build stage
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/src ./src
 
-# Expõe a porta (ajuste conforme necessário)
+# Nota: .env deve ser passado via variáveis de ambiente no Railway, não copiado
+
+# Expõe a porta
 EXPOSE 3000
 
-# Executa o binário
-CMD ["/app/server"]
+# Executa com bun diretamente
+CMD ["bun", "run", "src/index.ts"]

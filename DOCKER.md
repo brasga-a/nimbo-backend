@@ -3,15 +3,15 @@
 ## Descrição
 
 Este Dockerfile utiliza **multi-stage build** para:
-1. **Build Stage**: Compila o código TypeScript em um binário standalone usando `bun build --compile`
-2. **Runtime Stage**: Usa uma imagem distroless mínima que executa apenas o binário compilado
+1. **Build Stage**: Instala dependências com Bun
+2. **Runtime Stage**: Usa imagem slim do Bun para executar a aplicação
 
 ## Vantagens
 
-- ✅ **Imagem final pequena**: ~50MB (vs ~1GB com Node.js completo)
-- ✅ **Segurança**: Distroless não contém shell ou pacotes desnecessários
-- ✅ **Performance**: Binário compilado é mais rápido que interpretação
-- ✅ **Standalone**: Não precisa de runtime externo
+- ✅ **Imagem otimizada**: Usa `bun:latest-slim` para menor tamanho
+- ✅ **Build cache**: Dependências são instaladas separadamente do código
+- ✅ **Performance**: Execução direta com Bun runtime
+- ✅ **Compatível com Railway**: Funciona perfeitamente em ambientes de deploy
 
 ## Como Usar
 
@@ -33,12 +33,13 @@ docker run -p 3000:3000 \
 
 ### Usando Docker Compose
 
-1. Crie um arquivo `.env` na raiz do projeto:
+1. Certifique-se de ter um arquivo `.env` na raiz do projeto:
 
 ```env
 PORT=3000
 NODE_ENV=production
 FRONTEND_URL=http://localhost:3000
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
 # Adicione outras variáveis conforme necessário
 ```
 
@@ -55,6 +56,21 @@ docker-compose logs -f
 docker-compose down
 ```
 
+### Deploy no Railway
+
+No Railway, **não use arquivo .env**. Configure as variáveis de ambiente direto no painel:
+
+1. Acesse as configurações do projeto no Railway
+2. Vá em **Variables**
+3. Adicione cada variável:
+   - `PORT` (Railway define automaticamente)
+   - `NODE_ENV=production`
+   - `FRONTEND_URL=https://seu-frontend.com`
+   - `DATABASE_URL` (se usar PostgreSQL do Railway, ele auto-configura)
+   - Outras variáveis do seu projeto
+
+O Railway detecta automaticamente o Dockerfile e faz o build.
+
 ## Customização
 
 ### Alterar a Porta
@@ -65,17 +81,16 @@ Edite a variável `PORT` no `.env` ou no `docker-compose.yml`
 
 Descomente a seção do postgres no `docker-compose.yml` e configure as variáveis de conexão.
 
-### Otimizações Adicionais
+### Variáveis de Ambiente
 
-No Dockerfile, você pode ajustar as flags de build:
+O Docker Compose carrega automaticamente o arquivo `.env`. Para Docker run, passe via `-e`:
 
-```dockerfile
-RUN bun build src/index.ts \
-    --compile \
-    --minify \              # Minifica o código
-    --sourcemap \           # Gera sourcemaps (remova em produção se quiser)
-    --target=bun \          # Target específico do Bun
-    --outfile=server
+```bash
+docker run -p 3000:3000 \
+  -e PORT=3000 \
+  -e NODE_ENV=production \
+  -e DATABASE_URL=postgresql://... \
+  nimbo-backend
 ```
 
 ## Troubleshooting
