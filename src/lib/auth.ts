@@ -1,58 +1,83 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
 
-import { getUserFirstStepStatus } from "@/helpers/get-first-step";
-import { RESERVED_USERNAMES } from "@/helpers/invalid-usernames";
 import { db } from "@/drizzle/client";
 import { schema } from "@/drizzle/schemas/better-auth";
+import { getUserFirstStepStatus } from "@/helpers/get-first-step";
+import { RESERVED_USERNAMES } from "@/helpers/invalid-usernames";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { createAuthMiddleware } from "better-auth/api";
 import {
-  admin as adminPlugin,
-  customSession,
-  magicLink,
-  openAPI,
-  organization,
-  username,
+	admin as adminPlugin,
+	customSession,
+	emailOTP,
+	magicLink,
+	openAPI,
+	organization,
+	username,
 } from "better-auth/plugins";
 import { Resend } from "resend";
 
 const resend = new Resend(Bun.env.RESEND_API_KEY!);
 
 export const auth = betterAuth({
-  database: drizzleAdapter(db, {
-    schema,
-    provider: "pg",
-    usePlural: true,
-  }),
-  advanced: {
-    database: {
-      generateId: false,
-    },
-  },
+	database: drizzleAdapter(db, {
+		schema,
+		provider: "pg",
+		usePlural: true,
+	}),
+	advanced: {
+		database: {
+			generateId: false,
+		},
+	},
 
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    },
-  },
-  plugins: [
-    openAPI(),
-    adminPlugin(),
-    username({
-      usernameValidator: (username) => {
-        return !RESERVED_USERNAMES.includes(username.toLocaleLowerCase());
-      },
-      minUsernameLength: 2,
-      maxUsernameLength: 25,
-    }),
-    magicLink({
-      sendMagicLink: async ({ email, url }) => {
-        await resend.emails.send({
-          from: "Nimbo <noreplay@skelware.com>",
-          to: email,
-          subject: "Seu link mágico do Nimbo ✨",
-          html: `
+	socialProviders: {
+		google: {
+			prompt: "select_account",
+			clientId: process.env.GOOGLE_CLIENT_ID!,
+			clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+		},
+	},
+	logger: {
+		level: "debug",
+		log(level, message, args){
+			console.log(level, message, ...args);
+		}
+	},
+	plugins: [
+		openAPI(),
+		adminPlugin(),
+		username({
+			usernameValidator: (username) => {
+				return !RESERVED_USERNAMES.includes(username.toLocaleLowerCase());
+			},
+			minUsernameLength: 2,
+			maxUsernameLength: 25,
+		}),
+		emailOTP({
+			async sendVerificationOTP({ email, otp, type }){
+				if (type === "sign-in"){
+					await resend.emails.send({
+						from: "Nimbo <noreplay@skelware.com>",
+						to: email,
+						subject: "Seu código de acesso",
+						html: `<p>${otp}</p>`
+					})
+				} else if (type === "email-verification"){
+
+				}else {
+
+				}
+			}
+		}),
+		magicLink({
+			sendMagicLink: async ({ email, url }) => {
+				await resend.emails.send({
+					from: "Nimbo <noreplay@skelware.com>",
+					to: email,
+					subject: "Link de acesso ao Nimbo",
+					html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
               <h2>Entre no Nimbo</h2>
               <p>Clique no botão abaixo para fazer login:</p>
@@ -70,41 +95,47 @@ export const auth = betterAuth({
               </p>
             </div>
           `,
-        });
-      },
-      disableSignUp: false,
-    }),
-    organization({
-      teams: {
-        enabled: true,
-      },
-    }),
-    customSession(async ({ user, session }) => {
-      const firstStepCompleted = await getUserFirstStepStatus(session.userId);
-      return {
-        user: {
-          ...user,
-          firstStepCompleted,
-        },
-        session,
-      };
-    }),
-  ],
+				});
+			},
+			disableSignUp: false,
+		}),
+		organization({
+			teams: {
+				enabled: true,
+			},
+		}),
+		customSession(async ({ user, session }) => {
+			const firstStepCompleted = await getUserFirstStepStatus(session.userId);
+			return {
+				user: {
+					...user,
+					firstStepCompleted,
+				},
+				session,
+			};
+		}),
+	],
 
-  // hooks: {
-  //   after: createAuthMiddleware(async (ctx) => {
-  //     if (ctx.path.startsWith("/sign-in/magic-link/verify")) {
-  //       if (ctx.context.session) {
-  //         const firstStepCompleted = await getUserFirstStepStatus(
-  //           ctx.context.session?.user.id,
-  //         );
+	hooks: {
+		before: createAuthMiddleware(async (ctx) => {
+			if (ctx.path.startsWith('/callback/')) {
+				const error = ctx.query?.error
+				
+				if (error) {
+					return new Response(`
+						<script>
+							if (window.opener) {
+								window.opener.postMessage({type:'oauth_error', error:'${error}'},'*')
+								window.close()
+							} else {
+								window.location.href='/login?error=${error}'
+							}
+						</script>
+					`, { headers: { 'content-type': 'text/html' }})
+				}
+			}
+		}),
+  },
 
-  //         ctx.context.session.user.firstStepCompleted = firstStepCompleted;
-
-  //         return ctx;
-  //       }
-  //     }
-  //   }),
-  // },
-  trustedOrigins: [Bun.env.BETTER_AUTH_URL!, Bun.env.FRONTEND_URL!],
+	trustedOrigins: [Bun.env.BETTER_AUTH_URL!, Bun.env.FRONTEND_URL!],
 });

@@ -17,7 +17,10 @@ export const betterAuthPlugin = new Elysia({
           return status(401, { message: "Unauthorized. " });
         }
 
-        return session;
+        return {
+          user: session.user,
+          session: session.session,
+        };
       },
     },
   });
